@@ -1,0 +1,35 @@
+{
+  "name": "Duty Cycle Player",
+  "short_name": "Cycle Player",
+  "description": "Drive electric-bus duty cycles with live average speed, distance between stops and dwell-time guidance.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "background_color": "#0B0F14",
+  "theme_color": "#0B0F14",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
