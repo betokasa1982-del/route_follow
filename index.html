@@ -411,7 +411,7 @@ function depart(){ if(S.phase!=='stopped') return; nextSegment(); }
 function finish(){
   S.phase='finished';
   if(S.watchId!=null){navigator.geolocation.clearWatch(S.watchId);S.watchId=null;}
-  stopSim(); releaseWake();
+  stopSim();
   render();
 }
 
@@ -531,7 +531,7 @@ function pause(){
   if(S.phase==='driving'||S.phase==='stopped'){
     S._resume=S.phase; S.phase='paused'; pauseAt=performance.now();
     if(S.watchId!=null){navigator.geolocation.clearWatch(S.watchId);S.watchId=null;}
-    stopSim(); releaseWake();
+    stopSim();
   } else if(S.phase==='paused'){
     S.pausedMs+=performance.now()-pauseAt; S.phase=S._resume||'driving'; S.lastFix=null;
     requestWake(); if(S.sim) startSim(); else startGPS();
@@ -550,7 +550,7 @@ function resetState(){
 }
 function reset(){
   if(S.watchId!=null){navigator.geolocation.clearWatch(S.watchId);S.watchId=null;}
-  stopSim(); releaseWake(); resetState(); syncStartBtn(); render();
+  stopSim(); resetState(); syncStartBtn(); render();
   setGps(false);
 }
 
@@ -604,11 +604,19 @@ function posToLatLon(pos){
   return [P[P.length-1][0],P[P.length-1][1]];
 }
 
-/* ---------- wake lock ---------- */
+/* ---------- wake lock: keep screen on the whole time the app is open ---------- */
 let wakeWanted=true;
-async function requestWake(){ if(!wakeWanted)return; try{S.wake=await navigator.wakeLock.request('screen');}catch(e){} }
+async function requestWake(){
+  if(!wakeWanted || !('wakeLock' in navigator) || document.visibilityState!=='visible') return;
+  if(S.wake && !S.wake.released) return;                 // already held
+  try{ S.wake=await navigator.wakeLock.request('screen');
+       S.wake.addEventListener('release',()=>{ S.wake=null; }); // OS released it (e.g. backgrounded)
+  }catch(e){}
+}
 function releaseWake(){ try{S.wake&&S.wake.release();}catch(e){} S.wake=null; }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&wakeWanted&&(S.phase==='driving'||S.phase==='stopped'))requestWake(); });
+// re-acquire whenever the app comes back to the foreground, in any screen/state
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') requestWake(); });
+document.addEventListener('pointerdown',()=>requestWake());   // gesture fallback if load-time request was blocked
 
 /* ---------- map (offline canvas) ---------- */
 let mapOpen=false, mapBounds=null;
@@ -695,7 +703,7 @@ $('simPace').oninput=e=>{S.simPace=+e.target.value;$('simPaceLbl').textContent=S
 $('radius').oninput=e=>{S.radius=+e.target.value;$('radLbl').textContent=S.radius;};
 $('minHold').oninput=e=>{S.minHold=+e.target.value;$('minHoldLbl').textContent=S.minHold;};
 $('tgSound').onclick=e=>{soundOn=!soundOn;e.target.classList.toggle('on',soundOn);};
-$('tgWake').onclick=e=>{wakeWanted=!wakeWanted;e.target.classList.toggle('on',wakeWanted);if(!wakeWanted)releaseWake();else if(S.phase==='driving')requestWake();};
+$('tgWake').onclick=e=>{wakeWanted=!wakeWanted;e.target.classList.toggle('on',wakeWanted);if(!wakeWanted)releaseWake();else requestWake();};
 
 window.addEventListener('resize',()=>{if(mapOpen)drawMap();});
 
@@ -730,7 +738,7 @@ function showView(v){
   const lib=v==='library';
   $('viewLibrary').classList.toggle('hidden',!lib);
   $('viewDrive').classList.toggle('hidden',lib);
-  if(lib){ if(S.phase!=='idle') reset(); releaseWake(); mapOpen=false; $('mapWrap').classList.add('hidden'); }
+  if(lib){ if(S.phase!=='idle') reset(); mapOpen=false; $('mapWrap').classList.add('hidden'); }
 }
 function selectCycle(id){
   const c=LIB.find(x=>x.id===id); if(!c)return;
@@ -846,6 +854,7 @@ $('btnBack').onclick=()=>showView('library');
 
 /* boot */
 bootLibrary();
+requestWake();
 window.LIB=()=>LIB; // field diagnostics
 /* =================== PWA: install + offline =================== */
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
